@@ -8,6 +8,7 @@
     <PackageId>UtilityDelta.Honest.Runtime</PackageId>
     <RootNamespace>UtilityDelta.Honest</RootNamespace>
     <AssemblyName>UtilityDelta.Honest.Runtime</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Result&lt;T,E&gt; and Panic: errors as values, and a FailFast abort for unrecoverable invariants. The runtime half of UtilityDelta.Honest.Analyzers.</Description>
   </PropertyGroup>
 

@@ -32,7 +32,38 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
         }
 
         context.ReportDiagnostic(
-            Diagnostic.Create(Rules.NoProperties, prop.Identifier.GetLocation(), prop.Identifier.Text));
+            Diagnostic.Create(Rules.NoProperties, prop.Identifier.GetLocation(), Advice(context, prop)));
+    }
+
+    // The fix differs by shape, so the message names the one that applies.
+    private static string Advice(SyntaxNodeAnalysisContext context, PropertyDeclarationSyntax prop)
+    {
+        var name = prop.Identifier.Text;
+        if (prop.Parent is InterfaceDeclarationSyntax)
+        {
+            return $"Replace interface property '{name}' with a method; an interface cannot declare a field";
+        }
+
+        // External contracts are exempt before this point, so any interface left is our own.
+        if (ImplementsInterfaceMember(context, prop))
+        {
+            return $"Replace property '{name}' with a method, together with the interface property it implements";
+        }
+
+        var accessors = prop.AccessorList?.Accessors;
+        var computed = prop.ExpressionBody is not null
+            || (accessors?.Any(a => a.Body is not null || a.ExpressionBody is not null) ?? false);
+        if (computed)
+        {
+            return $"Replace computed property '{name}' with a method";
+        }
+
+        if (accessors?.Any(a => a.Modifiers.Count > 0) ?? false)
+        {
+            return $"Replace property '{name}' with a field; a field has one access level, so choose it by hand";
+        }
+
+        return $"Replace property '{name}' with a public field";
     }
 
     // An indexer hides code behind `obj[i]`, which reads like array access. Same lie as a property.
@@ -45,7 +76,10 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
         }
 
         context.ReportDiagnostic(
-            Diagnostic.Create(Rules.NoProperties, indexer.ThisKeyword.GetLocation(), "this[] indexer"));
+            Diagnostic.Create(
+                Rules.NoProperties,
+                indexer.ThisKeyword.GetLocation(),
+                "Replace the indexer with a named method such as At(i)"));
     }
 
     // A property that implements an interface or overrides a member declared in another
@@ -75,6 +109,19 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
             .Any(m => SymbolEqualityComparer.Default.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(m), symbol));
     }
 
+    private static bool ImplementsInterfaceMember(SyntaxNodeAnalysisContext context, PropertyDeclarationSyntax prop)
+    {
+        if (context.SemanticModel.GetDeclaredSymbol(prop, context.CancellationToken) is not IPropertySymbol symbol)
+        {
+            return false;
+        }
+
+        return symbol.ExplicitInterfaceImplementations.Length > 0
+            || symbol.ContainingType.AllInterfaces
+                .SelectMany(i => i.GetMembers().OfType<IPropertySymbol>())
+                .Any(m => SymbolEqualityComparer.Default.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(m), symbol));
+    }
+
     private static void AnalyzeRecord(SyntaxNodeAnalysisContext context)
     {
         var record = (RecordDeclarationSyntax)context.Node;
@@ -83,7 +130,7 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 Rules.NoProperties,
                 record.ParameterList.GetLocation(),
-                record.Identifier.Text + " positional parameters (they generate properties)"));
+                $"Replace the positional parameters of record '{record.Identifier.Text}' with fields and a constructor"));
         }
     }
 }

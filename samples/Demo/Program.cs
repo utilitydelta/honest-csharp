@@ -1,4 +1,5 @@
 using UtilityDelta.Honest;
+using PriceResult = UtilityDelta.Honest.Result<Money, OrderError>;
 
 // Data carriers: public readonly fields, real constructors, no properties.
 
@@ -54,21 +55,22 @@ public abstract record OrderError
 
 public static class Pricing
 {
-    // Errors are values: a Result, never a thrown exception.
-    public static Result<Money, OrderError> Price(OrderLine line, decimal cap)
+    // Errors are values: a Result, never a thrown exception. The `using PriceResult = ...`
+    // alias at the top keeps the long type out of every return.
+    public static PriceResult Price(OrderLine line, decimal cap)
     {
         if (line.Qty <= 0)
         {
-            return Result<Money, OrderError>.Err(new OrderError.EmptyLine(line.Sku));
+            return PriceResult.Err(new OrderError.EmptyLine(line.Sku));
         }
 
         var total = line.LineTotal();
         if (total > cap)
         {
-            return Result<Money, OrderError>.Err(new OrderError.OverLimit(cap));
+            return PriceResult.Err(new OrderError.OverLimit(cap));
         }
 
-        return Result<Money, OrderError>.Ok(new Money(total, "AUD"));
+        return PriceResult.Ok(new Money(total, "AUD"));
     }
 
     public static string Describe(OrderError error) => error switch

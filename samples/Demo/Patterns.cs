@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using UtilityDelta.Honest;
 
-// Reference patterns for the concurrency and performance sections of dotnet.md.
-// Each compiles clean under every rule; the comments name the rule it demonstrates.
+// Reference patterns for concurrency, performance and error handling in the honest style.
+// Each compiles clean under every rule; the comments say what each one demonstrates.
 
 // Concurrency rule 2: message-pass over shared-state-plus-lock. A Channel hands work
 // from producers to a single consumer with no lock anywhere.
@@ -136,6 +136,66 @@ public static class Boundary
             return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
         }
     }
+
+    // A pipeline: MapErr brings each stage onto one error type, Bind chains stages that can
+    // fail, Map transforms the value. The first Err short-circuits the rest.
+    public static Result<int, string> CountLines(string path) =>
+        ReadText(path)
+            .MapErr(Describe)
+            .Bind(NonEmpty)
+            .Map(text => text.Split('\n').Length);
+
+    private static Result<string, string> NonEmpty(string text) =>
+        text.Length == 0 ? Result<string, string>.Err("file is empty") : Result<string, string>.Ok(text);
+
+    // The same pipeline without lambdas: TryGet and an early return, Go style.
+    public static Result<int, string> CountLinesGoStyle(string path)
+    {
+        if (!ReadText(path).TryGet(out var text, out var error))
+        {
+            return Result<int, string>.Err(Describe(error));
+        }
+
+        if (text.Length == 0)
+        {
+            return Result<int, string>.Err("file is empty");
+        }
+
+        return Result<int, string>.Ok(text.Split('\n').Length);
+    }
+
+    // Success with nothing to return is Result<Unit, E>.
+    public static Result<Unit, IoError> WriteText(string path, string text)
+    {
+        try
+        {
+            File.WriteAllText(path, text);
+            return Result<Unit, IoError>.Ok(Unit.Value);
+        }
+        catch (IOException e)
+        {
+            return Result<Unit, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            return Result<Unit, IoError>.Err(new IoError.Denied(path, e.Message));
+        }
+        catch (ArgumentException e)
+        {
+            return Result<Unit, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+        catch (NotSupportedException e)
+        {
+            return Result<Unit, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+    }
+
+    public static string Describe(IoError error) => error switch
+    {
+        IoError.ReadFailed f => $"cannot read {f.Path}: {f.Why}",
+        IoError.Denied d => $"access denied to {d.Path}: {d.Why}",
+        _ => Panic.Value<string>($"unhandled {error}"),
+    };
 
     // Panic.Now is [DoesNotReturn], so the compiler knows `s` is non-null after the guard.
     public static int LengthOrPanic(string? s)

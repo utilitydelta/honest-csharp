@@ -14,10 +14,12 @@ The one gate. Builds the solution (the `samples/Demo` build breaks on any rule v
 
 1. Reproduce the false positive, false negative or bad fix as a failing test in `tests/Honest.Analyzers.Tests`. Watch it fail.
 2. Fix the rule or the code fix. Re-run `./check.sh`.
-3. Runtime changes (`Result`, `Panic`) have no test project; prove them through the Demo, which builds with every rule at error and `TreatWarningsAsErrors`. `Patterns.LengthOrPanic` is the proof that `[DoesNotReturn]` holds.
+3. Runtime changes (`Result`, `Unit`, `Panic`) get a test in `tests/Honest.Runtime.Tests`, and a use in the Demo, which builds with every rule at error and `TreatWarningsAsErrors`. `Patterns.LengthOrPanic` is the proof that `[DoesNotReturn]` holds.
 4. Update `README.md` if consumers see the change: the rule table, the fix table, the runtime API block.
 
 The analyzer is code under test, not a fixed oracle.
+
+The analyzer compiles against Roslyn 4.8 (the floor it supports); the test project runs Roslyn 5.0, the version `dotnet format` ships in the .NET 10 SDK. Keep them apart: fix-all behaves differently between the two, and `Harness.ApplyFixAll` copies `dotnet format`'s seeding exactly, so only the newer Roslyn reproduces what consumers see.
 
 ## Trying a change in another repo before release
 

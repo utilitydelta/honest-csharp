@@ -8,5 +8,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Honest.Analyzers.Tests/Honest.Analyzers.Tests.csproj" />
+    <Project Path="tests/Honest.Runtime.Tests/Honest.Runtime.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,7 +1,7 @@
 <Project>
   <!-- Package metadata shared by the two shipped packages. CI overrides Version from the git tag. -->
   <PropertyGroup>
-    <Version>1.0.1</Version>
+    <Version>2.0.0</Version>
     <Authors>Tyson Brown</Authors>
     <Copyright>Copyright (c) 2026 Tyson Brown</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

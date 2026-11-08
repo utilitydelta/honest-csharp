@@ -29,6 +29,21 @@ internal static class Harness
             .ToArray();
     }
 
+    // Compiler errors only, no analyzers: proves a code fix left the source compiling.
+    public static string[] CompileErrors(string source)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
+        return CSharpCompilation.Create(
+                "TestAsm",
+                new[] { tree },
+                Net80.References.All,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable))
+            .GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .Select(d => d.ToString())
+            .ToArray();
+    }
+
     public static string TextOf(this Diagnostic diagnostic, string source) =>
         source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length);
 
@@ -97,5 +112,51 @@ internal static class Harness
         var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
         var text = await changed.GetDocument(documentId)!.GetTextAsync();
         return text.ToString();
+    }
+
+    // Fix-all exactly as dotnet format's SolutionCodeFixApplier runs it: register fixes for
+    // the first diagnostic only, take that action's equivalence key (null when the first
+    // diagnostic is one the fixer declines), then fix-all at solution scope.
+    public static async Task<string> ApplyFixAll(
+        DiagnosticAnalyzer analyzer, CodeFixProvider fixer, string source)
+    {
+        var (document, first) = await Setup(analyzer, fixer, source);
+        var actions = new List<CodeAction>();
+        await fixer.RegisterCodeFixesAsync(new CodeFixContext(
+            document, first, (a, _) => actions.Add(a), CancellationToken.None));
+
+        var compilation = (await document.Project.GetCompilationAsync())!;
+        var all = (await compilation.WithAnalyzers(ImmutableArray.Create(analyzer)).GetAnalyzerDiagnosticsAsync())
+            .Where(d => fixer.FixableDiagnosticIds.Contains(d.Id))
+            .ToImmutableArray();
+
+        var context = new FixAllContext(
+            document, fixer, FixAllScope.Solution, actions.FirstOrDefault()?.EquivalenceKey!,
+            fixer.FixableDiagnosticIds, new FixedDiagnostics(all), CancellationToken.None);
+        var fix = await fixer.GetFixAllProvider()!.GetFixAsync(context);
+        if (fix is null)
+        {
+            return source; // what dotnet format does: log and change nothing
+        }
+
+        var operations = await fix.GetOperationsAsync(CancellationToken.None);
+        var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
+        return (await changed.GetDocument(document.Id)!.GetTextAsync()).ToString();
+    }
+
+    private sealed class FixedDiagnostics : FixAllContext.DiagnosticProvider
+    {
+        private readonly ImmutableArray<Diagnostic> _all;
+
+        public FixedDiagnostics(ImmutableArray<Diagnostic> all) => _all = all;
+
+        public override Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<Diagnostic>>(_all);
+
+        public override Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(Project project, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<Diagnostic>>(_all);
+
+        public override Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(Project project, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<Diagnostic>>(_all);
     }
 }
