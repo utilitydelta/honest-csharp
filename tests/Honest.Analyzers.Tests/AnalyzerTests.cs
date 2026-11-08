@@ -145,4 +145,75 @@ public sealed class AnalyzerTests
         Assert.Equal("HON004", d.Id);
         Assert.Equal("dynamic", d.TextOf(src));
     }
+
+    [Fact]
+    public void Implicit_bcl_interface_property_is_allowed()
+    {
+        const string src = """
+            using System.Collections;
+            using System.Collections.Generic;
+            public sealed class Counter : IEnumerator<int>
+            {
+                private int _i;
+                public int Current => _i;
+                object IEnumerator.Current => _i;
+                public bool MoveNext() => ++_i < 10;
+                public void Reset() => _i = 0;
+                public void Dispose() { }
+            }
+            """;
+        Assert.Empty(Harness.Analyze(new BanPropertiesAnalyzer(), src));
+    }
+
+    [Fact]
+    public void Bcl_override_property_is_allowed()
+    {
+        const string src = """
+            public sealed class Oops : System.Exception
+            {
+                public override string Message => "oops";
+            }
+            """;
+        Assert.Empty(Harness.Analyze(new BanPropertiesAnalyzer(), src));
+    }
+
+    [Fact]
+    public void Own_interface_property_is_still_flagged_on_both_sides()
+    {
+        const string src = """
+            public interface IHasValue { int Value { get; } }
+            public sealed class C : IHasValue
+            {
+                public int Value => 1;
+            }
+            """;
+        var ds = Harness.Analyze(new BanPropertiesAnalyzer(), src);
+        Assert.Equal(2, ds.Length);
+        Assert.All(ds, d => Assert.Equal("HON001", d.Id));
+    }
+
+    [Fact]
+    public void Positional_record_struct_is_flagged()
+    {
+        const string src = "public readonly record struct Point(int X, int Y);";
+        var d = Assert.Single(Harness.Analyze(new BanPropertiesAnalyzer(), src));
+        Assert.Equal("HON001", d.Id);
+    }
+
+    [Fact]
+    public void Bare_rethrow_is_flagged()
+    {
+        const string src = """
+            public sealed class C
+            {
+                public void M()
+                {
+                    try { System.Console.WriteLine(); }
+                    catch { throw; }
+                }
+            }
+            """;
+        var d = Assert.Single(Harness.Analyze(new BanThrowAnalyzer(), src));
+        Assert.Equal("HON002", d.Id);
+    }
 }

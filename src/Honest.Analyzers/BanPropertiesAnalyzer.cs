@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -25,6 +26,11 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SyntaxNodeAnalysisContext context)
     {
         var prop = (PropertyDeclarationSyntax)context.Node;
+        if (IsForcedByExternalContract(context, prop))
+        {
+            return;
+        }
+
         context.ReportDiagnostic(
             Diagnostic.Create(Rules.NoProperties, prop.Identifier.GetLocation(), prop.Identifier.Text));
     }
@@ -33,8 +39,40 @@ public sealed class BanPropertiesAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeIndexer(SyntaxNodeAnalysisContext context)
     {
         var indexer = (IndexerDeclarationSyntax)context.Node;
+        if (IsForcedByExternalContract(context, indexer))
+        {
+            return;
+        }
+
         context.ReportDiagnostic(
             Diagnostic.Create(Rules.NoProperties, indexer.ThisKeyword.GetLocation(), "this[] indexer"));
+    }
+
+    // A property that implements an interface or overrides a member declared in another
+    // assembly (IEnumerator<T>.Current, IReadOnlyList<T>[i], Stream.Length) cannot be a
+    // field: the contract is not ours to change. Contracts declared in our own code are.
+    private static bool IsForcedByExternalContract(SyntaxNodeAnalysisContext context, SyntaxNode node)
+    {
+        if (context.SemanticModel.GetDeclaredSymbol(node, context.CancellationToken) is not IPropertySymbol symbol)
+        {
+            return false;
+        }
+
+        var own = context.Compilation.Assembly;
+        if (symbol.OverriddenProperty is { } overridden && !SymbolEqualityComparer.Default.Equals(overridden.ContainingAssembly, own))
+        {
+            return true;
+        }
+
+        if (symbol.ExplicitInterfaceImplementations.Any(i => !SymbolEqualityComparer.Default.Equals(i.ContainingAssembly, own)))
+        {
+            return true;
+        }
+
+        return symbol.ContainingType.AllInterfaces
+            .Where(i => !SymbolEqualityComparer.Default.Equals(i.ContainingAssembly, own))
+            .SelectMany(i => i.GetMembers().OfType<IPropertySymbol>())
+            .Any(m => SymbolEqualityComparer.Default.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(m), symbol));
     }
 
     private static void AnalyzeRecord(SyntaxNodeAnalysisContext context)

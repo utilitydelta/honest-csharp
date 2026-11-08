@@ -99,6 +99,17 @@ public static class Boundary
         {
             return Result<string, IoError>.Err(new IoError.Denied(path, e.Message));
         }
+        // Banning `throw` does not stop the BCL throwing. Catch every exception the member
+        // documents: File.ReadAllText also throws ArgumentException (empty or invalid path)
+        // and NotSupportedException (bad path format).
+        catch (ArgumentException e)
+        {
+            return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+        catch (NotSupportedException e)
+        {
+            return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
     }
 
     // Result composes with async: Task<Result<...>>, cancellation threaded through.
@@ -112,6 +123,29 @@ public static class Boundary
         {
             return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
         }
+        catch (UnauthorizedAccessException e)
+        {
+            return Result<string, IoError>.Err(new IoError.Denied(path, e.Message));
+        }
+        catch (ArgumentException e)
+        {
+            return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+        catch (NotSupportedException e)
+        {
+            return Result<string, IoError>.Err(new IoError.ReadFailed(path, e.Message));
+        }
+    }
+
+    // Panic.Now is [DoesNotReturn], so the compiler knows `s` is non-null after the guard.
+    public static int LengthOrPanic(string? s)
+    {
+        if (s is null)
+        {
+            Panic.Now("LengthOrPanic: caller broke the non-null invariant");
+        }
+
+        return s.Length;
     }
 }
 

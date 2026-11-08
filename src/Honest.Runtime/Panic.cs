@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace UtilityDelta.Honest;
 
 // The `panic!()` carve-out. An unrecoverable invariant violation aborts the process
@@ -5,8 +7,10 @@ namespace UtilityDelta.Honest;
 // sanctioned alternative to `throw`, and it never throws.
 public static class Panic
 {
+    [DoesNotReturn]
     public static void Now(string why) => Environment.FailFast(why);
 
+    [DoesNotReturn]
     public static T Value<T>(string why)
     {
         Environment.FailFast(why);

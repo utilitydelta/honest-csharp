@@ -82,4 +82,25 @@ public sealed class CodeFixTests
         Assert.Contains("System.Obsolete", fixedSource);
         Assert.Contains("readonly int Value;", fixedSource);
     }
+
+    [Theory]
+    [InlineData("public int Value { get; private set; }")]
+    [InlineData("public int Value { get; protected init; }")]
+    [InlineData("public int Value { private get; set; }")]
+    public async Task Mixed_accessibility_property_gets_no_fix(string member)
+    {
+        // A field has one access level. Converting `{ get; private set; }` would silently
+        // widen the setter to public, so the fix must not be offered.
+        var src = "public class C { " + member + " }";
+        Assert.Equal(0, await Harness.FixCount(
+            new BanPropertiesAnalyzer(), new PropertyToFieldCodeFix(), src));
+    }
+
+    [Fact]
+    public async Task Computed_property_gets_no_fix()
+    {
+        const string src = "public sealed class C { public int X; public int Doubled => X * 2; }";
+        Assert.Equal(0, await Harness.FixCount(
+            new BanPropertiesAnalyzer(), new PropertyToFieldCodeFix(), src));
+    }
 }

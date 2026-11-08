@@ -35,6 +35,13 @@ public sealed class PropertyToFieldCodeFix : CodeFixProvider
             return;
         }
 
+        // `{ get; private set; }` has two access levels; a field has one. Converting would
+        // either widen the setter to public or narrow the getter, so leave it to a human.
+        if (prop.AccessorList.Accessors.Any(a => a.Modifiers.Count > 0))
+        {
+            return;
+        }
+
         context.RegisterCodeFix(
             CodeAction.Create(
                 "Convert to public field",

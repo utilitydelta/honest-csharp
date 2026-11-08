@@ -20,7 +20,7 @@ jobs:
       - run: ./check.sh
       - name: pack
         run: |
-          VERSION=1.0.0
+          VERSION=1.0.1
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${GITHUB_REF_NAME#v}"; fi
           dotnet pack src/Honest.Analyzers/Honest.Analyzers.csproj -c Release -o out -p:Version="$VERSION" --nologo
           dotnet pack src/Honest.Runtime/Honest.Runtime.csproj -c Release -o out -p:Version="$VERSION" --nologo
