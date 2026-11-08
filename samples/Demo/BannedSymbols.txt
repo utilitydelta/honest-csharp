@@ -1,0 +1,2 @@
+T:System.Reflection.Assembly;Reflection hides what runs; keep dispatch static
+M:System.IServiceProvider.GetService(System.Type);No service locator; inject through the constructor

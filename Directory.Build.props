@@ -1,0 +1,17 @@
+<Project>
+  <!-- Package metadata shared by the two shipped packages. CI overrides Version from the git tag. -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Authors>Tyson Brown</Authors>
+    <Copyright>Copyright (c) 2026 Tyson Brown</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/utilitydelta/honest-csharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/utilitydelta/honest-csharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>roslyn;analyzer;result;errors-as-values;code-style</PackageTags>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>

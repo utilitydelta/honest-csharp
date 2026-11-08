@@ -1,0 +1,30 @@
+root = true
+
+[*.cs]
+# Honest custom rules, escalated to build-breaking.
+dotnet_diagnostic.HON001.severity = error
+dotnet_diagnostic.HON002.severity = error
+dotnet_diagnostic.HON003.severity = error
+dotnet_diagnostic.HON004.severity = error
+
+# Native exhaustiveness: a missing case in a switch expression is an error.
+dotnet_diagnostic.CS8509.severity = error
+
+# Struct hygiene (built-in): readonly structs, readonly members, value-type equality.
+dotnet_diagnostic.IDE0250.severity = error
+dotnet_diagnostic.IDE0251.severity = error
+dotnet_diagnostic.CA1815.severity = error
+
+# Reinforce readonly-by-default for fields.
+dotnet_diagnostic.IDE0044.severity = error
+
+# Disable the platform rules that contradict the bans, so they cannot fight us when a
+# repo raises AnalysisMode. CA1051 wants properties over public fields (vs HON001);
+# CA1034 forbids the nested records our closed sum types use; CA1062's fix is a throw
+# (vs HON002).
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1034.severity = none
+dotnet_diagnostic.CA1062.severity = none
+
+# Reused: BannedApiAnalyzers reports a banned symbol use.
+dotnet_diagnostic.RS0030.severity = error
